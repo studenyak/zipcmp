@@ -46,7 +46,7 @@ ULONGLONG TimeHelper::subtruct(const FILETIME& ftLeft,const FILETIME& ftRight)
   uliRetValue.QuadPart = 0;
   uliRetValue = ul1;
   uliRetValue.QuadPart /= 10;
-  //uliRetValue.QuadPart /= 1000;
+  uliRetValue.QuadPart /= 1000;
 
   return uliRetValue.QuadPart;
 }
