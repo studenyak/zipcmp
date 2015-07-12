@@ -11,6 +11,26 @@
 #include <sstream>
 #include "snappy\snappy.h"
 
+namespace std
+{
+	#ifdef UNICODE
+		typedef wifstream tifstream;
+		typedef wios tios;
+		typedef wostringstream tostringstream;
+	#else
+		typedef ifstream tifstream;
+		typedef ios tios;
+		typedef ostringstream tostringstream;
+	#endif
+}
+
+CompressionInfo::CompressionInfo()
+	: compressorName(TEXT(""))
+	, originalLength(0)
+	, compressedLength(0)
+	, compressingTime(0)
+{}
+
 void CompressionInfo::print(void) const
 {
 	int const size = 512;
@@ -19,12 +39,14 @@ void CompressionInfo::print(void) const
 		tchBuf,
 		size*sizeof(TCHAR),
 		TEXT("compressor: %s\n")
-		TEXT("original length: \t%d \tBytes\n")
-		TEXT("compressed length: \t%d \tBytes\n")
-		TEXT("compressing time: \t%d \tmsec\n"),
+		TEXT("original length: \t%d Bytes\n")
+		TEXT("compressed length: \t%d Bytes\n")
+		TEXT("compress rate: \t\t%.3f\n")
+		TEXT("compressing time: \t%d msec\n"),
 		compressorName.c_str(),
 		originalLength,
 		compressedLength,
+		(float)originalLength/compressedLength,
 		compressingTime);
 
 	std::wcout << tchBuf << std::endl;
@@ -33,78 +55,109 @@ void CompressionInfo::print(void) const
 
 DWORD getFileSize(__in const std::tstring strFilePath)
 { 
-	std::ifstream zipFileStream;
+	std::tifstream zipFileStream;
 	std::streamoff length;
-	zipFileStream.open(strFilePath, std::ios::binary | std::ios::in);          // open input file
+	zipFileStream.open(strFilePath, std::tios::binary | std::tios::in);          // open input file
 	if(!zipFileStream.is_open())
 		return 0;
-	zipFileStream.seekg(0, std::ios::end);    // go to the end
+	zipFileStream.seekg(0, std::tios::end);    // go to the end
 	length = zipFileStream.tellg();
 	zipFileStream.close();
 	return length;
 }
 
-void zipFile(__in const std::tstring& strFilePath,
+void zipFile(__in const FileList& fileList,
 			 __inout CompressionInfo& compresInfo)
 {
-	compresInfo.originalLength = getFileSize(strFilePath);
 	compresInfo.compressorName.assign(TEXT("zip"));
+	std::tstring strCompressedFile = fileList[0];
+	strCompressedFile.append(TEXT(".cmpzip"));
 
-	std::tstring strCompressedFile = strFilePath;
-	strCompressedFile.append(TEXT(".cmp"));
-	strCompressedFile.append(compresInfo.compressorName);
+	SYSTEMTIME startSysTime, endSysTime;
+	FILETIME startFileTime, endFileTime;
 
 	HZIP hZip = CreateZip(strCompressedFile.c_str(), 0);
-	SYSTEMTIME startSysTime, endSysTime;
-	GetSystemTime(&startSysTime);
-	ZipAdd(hZip, strCompressedFile.c_str(), strFilePath.c_str());
-	GetSystemTime(&endSysTime);
+	for(auto strFilePath : fileList)
+	{
+		compresInfo.originalLength += getFileSize(strFilePath);
+	
+		GetSystemTime(&startSysTime);
+		ZipAdd(hZip, strCompressedFile.c_str(), strFilePath.c_str());
+		GetSystemTime(&endSysTime);
 
-	FILETIME startFileTime, endFileTime;
-	SystemTimeToFileTime(&startSysTime, &startFileTime);
-	SystemTimeToFileTime(&endSysTime, &endFileTime);
+		SystemTimeToFileTime(&startSysTime, &startFileTime);
+		SystemTimeToFileTime(&endSysTime, &endFileTime);
+
+		compresInfo.compressingTime += TimeHelper::subtruct(endFileTime, startFileTime);
+	}
+
 	CloseZip(hZip);
-
 	compresInfo.compressedLength = getFileSize(strCompressedFile);
-	compresInfo.compressingTime = TimeHelper::subtruct(endFileTime, startFileTime);
 }
 
-void snappyFile(__in const std::tstring& strFilePath,
+void snappyFile(__in const FileList& fileList,
 				__inout CompressionInfo& compresInfo)
 {
-	compresInfo.originalLength = getFileSize(strFilePath);
-
-	std::ifstream inputFileStream;
-	inputFileStream.open(strFilePath, std::ios::binary | std::ios::in);
+	compresInfo.compressorName.assign(TEXT("snappy"));
+	std::tstring strCompressedFile = compresInfo.compressorName;
+	strCompressedFile.append(TEXT(".cmp"));
 
 	std::ostringstream oStringStream;
-	oStringStream << inputFileStream;
+	for(auto strFilePath : fileList)
+	{
+		compresInfo.originalLength += getFileSize(strFilePath);
 
-	std::string compressedString;
+		std::ifstream inputFileStream;
+		//std::wcout << TEXT("Open file: ") << strFilePath << std::endl;
+		inputFileStream.open(strFilePath, std::ios::binary | std::ios::in);
+		if(!inputFileStream.is_open())
+		{
+			std::wcout << TEXT("Could not open file to for reading: ") << strFilePath << std::endl;
+			return;
+		}
+		//std::cout << TEXT("Add data to output stream") << inputFileStream.rdbuf() << std::endl;
+		oStringStream << inputFileStream.rdbuf();
+		inputFileStream.close();
+	}
+
+	std::string outString;
+	size_t originalDataSize = oStringStream.str().size();
+
+	//std::wcout << TEXT("Size of original data: ") << originalDataSize << std::endl;
+	char* chCompressedData = new char[snappy::MaxCompressedLength(originalDataSize)];
+	size_t compressedDataSize = 0;
 	SYSTEMTIME startSysTime, endSysTime;
-	GetSystemTime(&startSysTime);
-	snappy::Compress(oStringStream.str().c_str(), compresInfo.originalLength, &compressedString);
-	GetSystemTime(&endSysTime);
-
 	FILETIME startFileTime, endFileTime;
+	//std::wcout << TEXT("Run compression") << std::endl;
+	GetSystemTime(&startSysTime);
+	snappy::RawCompress(
+		oStringStream.str().c_str(),
+		originalDataSize,
+		chCompressedData,
+		&compressedDataSize);
+	GetSystemTime(&endSysTime);
+	//std::wcout << TEXT("Size of compressed data: ") << compressedDataSize << std::endl;
+
 	SystemTimeToFileTime(&startSysTime, &startFileTime);
 	SystemTimeToFileTime(&endSysTime, &endFileTime);
-
-	compresInfo.compressorName.assign(TEXT("snappy"));
-	std::tstring strCompressedFile = strFilePath;
-	strCompressedFile.append(TEXT(".cmp"));
-	strCompressedFile.append(compresInfo.compressorName);
 	
 	std::ofstream compressedFile;
-	compressedFile.open(strCompressedFile, std::ios::binary | std::ios::out);
-	compressedFile << compressedString;
 	
+	//std::wcout << TEXT("Write output stream to file: ") << strCompressedFile << std::endl;
+	compressedFile.open(strCompressedFile, std::ios::binary | std::ios::out);
+	if(!compressedFile.is_open())
+	{
+		std::cout << "Could not open file to write: " << strCompressedFile.c_str() << std::endl;
+		return;
+	}
+
+	compressedFile.write(chCompressedData, compressedDataSize);
+	compressedFile.close();
+	delete[] chCompressedData;
+
 	compresInfo.compressedLength = getFileSize(strCompressedFile);
 	compresInfo.compressingTime = TimeHelper::subtruct(endFileTime, startFileTime);
 
-	inputFileStream.close();
-	compressedFile.close();
-	
 }
 
 void printComparision(__in const std::vector<CompressionInfo>& infoList)
@@ -123,12 +176,16 @@ int _tmain(int argc, _TCHAR* argv[])
 			return -1;
 		}
 
-		std::tstring strFileName(argv[1]);
+		FileList fileList;
+		unsigned int i = 0;
+		while(argv[++i] != NULL)
+			fileList.push_back(std::tstring(argv[i]));
+
 		CompressionInfo zipinfo;
-		zipFile(strFileName, zipinfo);
+		zipFile(fileList, zipinfo);
 
 		CompressionInfo snappyInfo;
-		snappyFile(strFileName, snappyInfo);
+		snappyFile(fileList, snappyInfo);
 
 		std::vector<CompressionInfo> infoList;
 		infoList.push_back(zipinfo);
@@ -144,7 +201,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	catch(...)
 	{
-		std::cerr << "Error: " << std::endl;
+		std::cerr << "Error: Panic" << std::endl;
 		return -1;
 	}
 }

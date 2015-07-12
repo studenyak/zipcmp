@@ -9,6 +9,7 @@
 
 struct CompressionInfo
 {
+	CompressionInfo();
 	std::tstring compressorName;
 	DWORD originalLength;
 	DWORD compressedLength;
@@ -17,10 +18,12 @@ struct CompressionInfo
 	void print(void) const;
 };
 
-void zipFile(__in const std::tstring& strFilePath,
+typedef std::vector<std::tstring> FileList;
+
+void zipFile(__in const FileList& fileList,
 			 __inout CompressionInfo& compresInfo);
 
-void snappyFile(__in const std::tstring& strFilePath,
+void snappyFile(__in const FileList& fileList,
 				__inout CompressionInfo& compresInfo);
 
 void printComparision(__in const std::vector<CompressionInfo>& infoList);
