@@ -10,6 +10,7 @@
 #include "TimeHelper.h"
 #include <sstream>
 #include "snappy\snappy.h"
+#include "lz4\lz4.h"
 
 namespace std
 {
@@ -39,10 +40,10 @@ void CompressionInfo::print(void) const
 		tchBuf,
 		size*sizeof(TCHAR),
 		TEXT("compressor: %s\n")
-		TEXT("original length: \t%d Bytes\n")
-		TEXT("compressed length: \t%d Bytes\n")
-		TEXT("compress rate: \t\t%.3f\n")
-		TEXT("compressing time: \t%d msec\n"),
+		TEXT("original length: %d Bytes\n")
+		TEXT("compressed length: %d Bytes\n")
+		TEXT("compress rate: %.3f\n")
+		TEXT("compressing time: %d msec\n"),
 		compressorName.c_str(),
 		originalLength,
 		compressedLength,
@@ -70,8 +71,8 @@ void zipFile(__in const FileList& fileList,
 			 __inout CompressionInfo& compresInfo)
 {
 	compresInfo.compressorName.assign(TEXT("zip"));
-	std::tstring strCompressedFile = fileList[0];
-	strCompressedFile.append(TEXT(".cmpzip"));
+	std::tstring strCompressedFile = compresInfo.compressorName;
+	strCompressedFile.append(TEXT(".cmp"));
 
 	SYSTEMTIME startSysTime, endSysTime;
 	FILETIME startFileTime, endFileTime;
@@ -96,9 +97,10 @@ void zipFile(__in const FileList& fileList,
 }
 
 void snappyFile(__in const FileList& fileList,
-				__inout CompressionInfo& compresInfo)
+				__inout CompressionInfo& compresInfo,
+				__in const std::tstring& strCompressorName)
 {
-	compresInfo.compressorName.assign(TEXT("snappy"));
+	compresInfo.compressorName = strCompressorName;
 	std::tstring strCompressedFile = compresInfo.compressorName;
 	strCompressedFile.append(TEXT(".cmp"));
 
@@ -130,11 +132,22 @@ void snappyFile(__in const FileList& fileList,
 	FILETIME startFileTime, endFileTime;
 	//std::wcout << TEXT("Run compression") << std::endl;
 	GetSystemTime(&startSysTime);
-	snappy::RawCompress(
-		oStringStream.str().c_str(),
-		originalDataSize,
-		chCompressedData,
-		&compressedDataSize);
+	if (compresInfo.compressorName == std::tstring(TEXT("snappy")))
+	{
+		snappy::RawCompress(
+			oStringStream.str().c_str(),
+			originalDataSize,
+			chCompressedData,
+			&compressedDataSize);
+	}
+	else
+	{
+		compressedDataSize = LZ4_compress(
+			oStringStream.str().c_str(),
+			chCompressedData,
+			originalDataSize);
+	}
+
 	GetSystemTime(&endSysTime);
 	//std::wcout << TEXT("Size of compressed data: ") << compressedDataSize << std::endl;
 
@@ -157,7 +170,6 @@ void snappyFile(__in const FileList& fileList,
 
 	compresInfo.compressedLength = getFileSize(strCompressedFile);
 	compresInfo.compressingTime = TimeHelper::subtruct(endFileTime, startFileTime);
-
 }
 
 void printComparision(__in const std::vector<CompressionInfo>& infoList)
@@ -183,13 +195,17 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		CompressionInfo zipinfo;
 		zipFile(fileList, zipinfo);
-
+		
 		CompressionInfo snappyInfo;
 		snappyFile(fileList, snappyInfo);
+
+		CompressionInfo lz4Info;
+		snappyFile(fileList, lz4Info, TEXT("lz4"));
 
 		std::vector<CompressionInfo> infoList;
 		infoList.push_back(zipinfo);
 		infoList.push_back(snappyInfo);
+		infoList.push_back(lz4Info);
 		printComparision(infoList);
 
 		return 0;

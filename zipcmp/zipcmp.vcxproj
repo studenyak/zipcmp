@@ -81,7 +81,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Header.h" />
-    <ClInclude Include="sha1\sha1.h" />
+    <ClInclude Include="lz4\lz4.h" />
     <ClInclude Include="snappy\snappy-internal.h" />
     <ClInclude Include="snappy\snappy-sinksource.h" />
     <ClInclude Include="snappy\snappy-stubs-internal.h" />
@@ -95,7 +95,7 @@
     <ClInclude Include="zip\zip.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="sha1\sha1.cpp" />
+    <ClCompile Include="lz4\lz4.c" />
     <ClCompile Include="snappy\snappy-sinksource.cc" />
     <ClCompile Include="snappy\snappy-stubs-internal.cc" />
     <ClCompile Include="snappy\snappy.cc" />

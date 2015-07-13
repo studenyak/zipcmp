@@ -24,6 +24,10 @@ void zipFile(__in const FileList& fileList,
 			 __inout CompressionInfo& compresInfo);
 
 void snappyFile(__in const FileList& fileList,
+				__inout CompressionInfo& compresInfo,
+				__in const std::tstring& strCompressorNme = _T("snappy"));
+
+void lz4(__in const FileList& fileList,
 				__inout CompressionInfo& compresInfo);
 
 void printComparision(__in const std::vector<CompressionInfo>& infoList);

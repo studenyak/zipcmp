@@ -25,6 +25,12 @@
     <Filter Include="Source Files\snappy">
       <UniqueIdentifier>{fea58015-2a24-4dcf-9966-1477bffbea5f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\lz4">
+      <UniqueIdentifier>{d95c2434-c931-4dce-aa32-30fc7b6f0e8b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\lz4">
+      <UniqueIdentifier>{4063966d-ab95-4282-a698-b88a2ba0290e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -66,6 +72,9 @@
     <ClInclude Include="tstring.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="lz4\lz4.h">
+      <Filter>Header Files\lz4</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -88,6 +97,9 @@
     </ClCompile>
     <ClCompile Include="snappy\snappy-stubs-internal.cc">
       <Filter>Source Files\snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="lz4\lz4.c">
+      <Filter>Source Files\lz4</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
